@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Questionário SUS com Cálculo de Escore</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <style>
+        /* CSS (sem alterações, mantido o mesmo estilo) */
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            color: #333;
+            line-height: 1.6;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 900px;
+        }
+
+        h1, h2 {
+            text-align: center;
+            color: #0056b3;
+        }
+        
+        .header-info {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .name-section {
+            margin-bottom: 25px;
+            text-align: center;
+        }
+
+        .name-section label {
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        .name-section input[type="text"] {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            width: 50%;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 25px;
+        }
+
+        th, td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: center;
+        }
+
+        th {
+            background-color: #0056b3;
+            color: white;
+            font-size: 0.9em;
+        }
+
+        td:first-child {
+            text-align: left;
+            font-weight: bold;
+            width: 50%;
+        }
+        
+        input[type="radio"] {
+            cursor: pointer;
+        }
+
+        .actions {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        button {
+            background-color: #28a745;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px 10px;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+        
+        button.print-btn {
+            background-color: #007bff;
+        }
+
+        button.calc-btn {
+            background-color: #ffc107;
+            color: #212529;
+        }
+
+        /* NOVA SEÇÃO DE RESULTADOS */
+        #results-section {
+            display: none; /* Inicia oculto */
+            text-align: center;
+            margin-top: 30px;
+            padding: 20px;
+            border: 2px dashed #0056b3;
+            border-radius: 8px;
+            background-color: #e7f3ff;
+        }
+
+        #results-section h3 {
+            margin-top: 0;
+            color: #0056b3;
+        }
+
+        #final-score {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #28a745;
+        }
+
+        #score-interpretation {
+            font-size: 1.2em;
+            font-style: italic;
+        }
+
+        /* Estilos para Impressão */
+        @media print {
+            body {
+                background-color: #fff;
+                padding: 0;
+            }
+            .container {
+                box-shadow: none;
+                border: 1px solid #ccc;
+            }
+            .actions, .header-info {
+                display: none;
+            }
+            #print-header {
+                display: block !important;
+                text-align: center;
+                margin-bottom: 20px;
+            }
+            #results-section { /* Garante que os resultados apareçam na impressão */
+                display: block !important; 
+                border: none;
+                background-color: #fff;
+            }
+            table, th, td {
+                font-size: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container" id="questionnaire-container">
+       
+        <h1>Questionário SUS (System Usability Scale)</h1>
+
+        <div id="print-header" style="display: none;">
+             </div>
+
+        <div class="name-section">
+            <label for="userName">nome:</label>
+            <input type="text" id="userName" placeholder="Digite seu nome completo aqui">
+        </div>
+
+        <form id="sus-form">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Questão</th>
+                        <th>1<br>Discordo<br>completamente</th>
+                        <th>2<br>Discordo</th>
+                        <th>3<br>Neutro</th>
+                        <th>4<br>Concordo</th>
+                        <th>5<br>Concordo<br>completamente</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    </tbody>
+            </table>
+        </form>
+
+        <div class="actions">
+            <button type="button" class="calc-btn" onclick="calculateAndShowScore()">🧮 Calcular Escore</button>
+            <button type="button" class="print-btn" onclick="printQuestionnaire()">🖨️ Imprimir Respostas</button>
+            <button type="button" onclick="exportToXLSX()">📄 Exportar para .XLSX</button>
+        </div>
+
+        <div id="results-section">
+            <h3>Escore de Usabilidade (SUS)</h3>
+            <p id="final-score">--</p>
+            <p id="score-interpretation">--</p>
+        </div>
+    </div>
+
+    <script>
+        const questions = [
+            "Eu acho que usaria este sistema com frequência.",
+            "Eu achei o sistema desnecessariamente complexo.",
+            "Eu achei o sistema fácil de usar.",
+            "Eu acho que precisaria de ajuda de uma pessoa com conhecimentos técnicos para usar o sistema.",
+            "Eu acho que as várias funções do sistema estão bem integradas.",
+            "Eu acho que há muita inconsistência no sistema.",
+            "Eu imagino que a maioria das pessoas aprenderia a usar este sistema rapidamente.",
+            "Eu achei o sistema muito complicado de usar.",
+            "Eu me senti muito confiante usando o sistema.",
+            "Eu precisei aprender várias coisas antes de conseguir usar o sistema."
+        ];
+
+        function renderQuestions() {
+            const tableBody = document.querySelector("#sus-form tbody");
+            let html = "";
+            questions.forEach((question, index) => {
+                const questionNumber = index + 1;
+                html += `
+                    <tr>
+                        <td>${questionNumber}. ${question}</td>
+                        ${[1, 2, 3, 4, 5].map(value => `
+                            <td>
+                                <input type="radio" name="q${questionNumber}" value="${value}" required>
+                            </td>
+                        `).join('')}
+                    </tr>
+                `;
+            });
+            tableBody.innerHTML = html;
+        }
+
+        function validateForm() {
+            const userName = document.getElementById("userName").value.trim();
+            if (!userName) {
+                alert("Por favor, preencha o seu nome.");
+                return false;
+            }
+            for (let i = 1; i <= questions.length; i++) {
+                if (!document.querySelector(`input[name="q${i}"]:checked`)) {
+                    alert(`Por favor, responda à questão de número ${i}.`);
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        // NOVA FUNÇÃO para calcular o escore
+        function calculateSusScore() {
+            let scoreSum = 0;
+            for (let i = 1; i <= questions.length; i++) {
+                const value = parseInt(document.querySelector(`input[name="q${i}"]:checked`).value);
+                if (i % 2 !== 0) { // Questões ímpares
+                    scoreSum += (value - 1);
+                } else { // Questões pares
+                    scoreSum += (5 - value);
+                }
+            }
+            return scoreSum * 2.5;
+        }
+
+        // NOVA FUNÇÃO para calcular e exibir o resultado na tela
+        function calculateAndShowScore() {
+            if (!validateForm()) return;
+
+            const finalScore = calculateSusScore();
+            const interpretation = finalScore >= 68 ? "Acima da média" : "Abaixo da média";
+
+            document.getElementById("final-score").textContent = finalScore.toFixed(1);
+            document.getElementById("score-interpretation").textContent = `Interpretação: ${interpretation}`;
+            
+            const resultsSection = document.getElementById("results-section");
+            resultsSection.style.display = "block";
+        }
+
+        function printQuestionnaire() {
+            if (!validateForm()) return;
+            
+            const userName = document.getElementById("userName").value;
+            const printHeader = document.getElementById("print-header");
+            
+            // Verifica se o score foi calculado para adicioná-lo à impressão
+            const scoreText = document.getElementById("final-score").textContent;
+            let scoreInfo = "";
+            if(scoreText !== "--") {
+                const interpretationText = document.getElementById("score-interpretation").textContent;
+                scoreInfo = `<br><strong>Escore Final: ${scoreText}</strong> (${interpretationText})`;
+            }
+
+            printHeader.innerHTML = `<h2>Respostas de: ${userName}${scoreInfo}</h2>`;
+            window.print();
+        }
+
+        function exportToXLSX() {
+            if (!validateForm()) return;
+
+            const userName = document.getElementById("userName").value.trim();
+            const scaleLabels = {
+                '1': 'Discordo completamente',
+                '2': 'Discordo',
+                '3': 'Neutro',
+                '4': 'Concordo',
+                '5': 'Concordo completamente'
+            };
+            
+            const data = [
+                ["Nome:", userName],
+                [], 
+                ["#", "Questão", "Resposta (Valor)", "Resposta (Texto)"]
+            ];
+
+            questions.forEach((question, index) => {
+                const qNum = index + 1;
+                const value = document.querySelector(`input[name="q${qNum}"]:checked`).value;
+                data.push([qNum, question, parseInt(value), scaleLabels[value]]);
+            });
+
+            // Adiciona o escore e a interpretação ao final do arquivo Excel
+            const finalScore = calculateSusScore();
+            const interpretation = finalScore >= 68 ? "Acima da média" : "Abaixo da média";
+
+            data.push([]); // Linha em branco
+            data.push(["Escore Final (0-100):", finalScore.toFixed(1)]);
+            data.push(["Interpretação:", interpretation]);
+
+            const worksheet = XLSX.utils.aoa_to_sheet(data);
+            worksheet['!cols'] = [{ wch: 20 }, { wch: 80 }, { wch: 15 }, { wch: 25 }];
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Respostas SUS");
+
+            const fileName = `Questionario_SUS_${userName.replace(/ /g, "_")}.xlsx`;
+            XLSX.writeFile(workbook, fileName);
+        }
+
+        document.addEventListener('DOMContentLoaded', renderQuestions);
+    </script>
+</body>
+</html>
